@@ -22,7 +22,7 @@
       <button class="identity-pill" type="button" onclick="document.getElementById('identity').showModal()">
         {% if selected_person %}<span>{{ selected_person.avatar }}</span> {{ selected_person.name }}{% else %}Who are you?{% endif %}
       </button>
-      <button class="ghost" id="theme-button" type="button" onclick="document.getElementById('appearance').showModal()">Change look</button>
+      <button class="ghost appearance-button" id="theme-button" type="button" aria-label="Change appearance" onclick="document.getElementById('appearance').showModal()"><span class="appearance-icon" aria-hidden="true">◐</span><span class="appearance-label">Change look</span></button>
       <button class="ghost rota-button" type="button" onclick="document.getElementById('rotation-dialog').showModal()">Rota start</button>
       <button class="dark-button" type="button" onclick="document.getElementById('setup').showModal()">Manage home</button>
     </div>
