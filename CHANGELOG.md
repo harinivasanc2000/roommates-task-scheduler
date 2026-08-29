@@ -28,3 +28,11 @@ This file is an append-only history of Homeflow. Do not delete, rewrite, reorder
 - Added a Render Blueprint for creating the web service and PostgreSQL database.
 - Added automatic Render hostname and CSRF configuration.
 - Expanded rotation coverage to six automated tests.
+
+## 0.3.1 — 2026-08-29 — `bfb73fc`
+
+- Added a production data migration that safely creates Hari, Huanlin, Jaclyn, and Tanith on a fresh PostgreSQL database.
+- Restored the intended rotation with Hari owning 24–30 August and Huanlin starting Monday 31 August 2026.
+- Added an always-visible close button to the identity picker.
+- Added options to continue without choosing or open household management directly.
+- Added regression coverage for the identity-popup escape path.
