@@ -1,11 +1,14 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.db.models import Q
+from django.contrib.auth.hashers import check_password, make_password
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Chore, Roommate, RotaSettings, TaskStatus, upcoming_monday
+from .models import Chore, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
 from .services import build_week, monday_for, week_owner
 
 
@@ -19,6 +22,8 @@ def _requested_week(request):
 def schedule(request):
     week_start = _requested_week(request)
     rota_settings = RotaSettings.load()
+    active_roommates = Roommate.objects.filter(active=True).order_by("name")
+    selected_person = active_roommates.filter(pk=request.session.get("roommate_id")).first()
     weeks = []
     all_items = []
     for week_offset in range(5):
@@ -43,11 +48,17 @@ def schedule(request):
             day = start + timedelta(days=offset)
             days.append({"date": day, "items": [item for item in week_items if item.date == day]})
         done = sum(item.completed for item in week_items)
+        owner = week_owner(start)
         weeks.append({"start": start, "end": start + timedelta(days=6), "days": days,
-                      "owner": week_owner(start), "done": done, "total": len(week_items),
+                      "owner": owner, "is_mine": bool(selected_person and owner == selected_person),
+                      "done": done, "total": len(week_items),
                       "percent": round((done / len(week_items)) * 100) if week_items else 0})
-    active_roommates = Roommate.objects.filter(active=True).order_by("name")
-    selected_person = active_roommates.filter(pk=request.session.get("roommate_id")).first()
+    personal_week = next((week for week in weeks if week["is_mine"]), None)
+    incoming_swaps = RotaSwap.objects.none()
+    sent_swaps = RotaSwap.objects.none()
+    if selected_person:
+        incoming_swaps = RotaSwap.objects.filter(requested_with=selected_person, status=RotaSwap.Status.PENDING)
+        sent_swaps = RotaSwap.objects.filter(requested_by=selected_person)[:3]
     return render(request, "rota/schedule.html", {
         "weeks": weeks,
         "week_start": week_start,
@@ -59,6 +70,9 @@ def schedule(request):
         "rota_settings": rota_settings,
         "selected_person": selected_person,
         "needs_identity": selected_person is None,
+        "personal_week": personal_week,
+        "incoming_swaps": incoming_swaps,
+        "sent_swaps": sent_swaps,
     })
 
 
@@ -67,6 +81,15 @@ def choose_person(request):
     person = Roommate.objects.filter(pk=request.POST.get("roommate_id"), active=True).first()
     if not person:
         return HttpResponseBadRequest("Choose an active roommate")
+    pin = request.POST.get("pin", "")
+    if person.pin_hash:
+        if not check_password(pin, person.pin_hash):
+            return HttpResponseForbidden("That PIN is not correct")
+    else:
+        if len(pin) != 4 or not pin.isdigit():
+            return HttpResponseBadRequest("Create a 4-digit PIN for this roommate")
+        person.pin_hash = make_password(pin)
+        person.save(update_fields=["pin_hash"])
     request.session["roommate_id"] = person.id
     return redirect(request.POST.get("next", "/"))
 
@@ -79,6 +102,13 @@ def update_task(request):
         roommate = Roommate.objects.get(pk=request.POST["roommate_id"])
     except (KeyError, ValueError, Chore.DoesNotExist, Roommate.DoesNotExist):
         return HttpResponseBadRequest("Unknown task")
+    selected_person = Roommate.objects.filter(pk=request.session.get("roommate_id"), active=True).first()
+    if not selected_person or selected_person != roommate:
+        return HttpResponseForbidden("You can only change tasks assigned to you")
+    valid_task = any(item.date == task_date and item.chore.id == chore.id and item.roommate == roommate
+                     for item in build_week(monday_for(task_date)))
+    if not valid_task:
+        return HttpResponseBadRequest("This task is not part of the current rota")
     status, _ = TaskStatus.objects.get_or_create(task_date=task_date, chore=chore, roommate=roommate)
     if "completed" in request.POST:
         status.completed = request.POST["completed"] == "true"
@@ -91,6 +121,56 @@ def update_task(request):
             return HttpResponseBadRequest("A task can only be moved within its assigned week")
         status.scheduled_for = scheduled_for
     status.save()
+    return redirect(request.POST.get("next", "/"))
+
+
+@require_POST
+def request_swap(request):
+    selected_person = Roommate.objects.filter(pk=request.session.get("roommate_id"), active=True).first()
+    if not selected_person:
+        return HttpResponseForbidden("Choose who you are first")
+    try:
+        requester_week = monday_for(date.fromisoformat(request.POST["requester_week"]))
+        requested_with = Roommate.objects.get(pk=request.POST["requested_with"], active=True)
+    except (KeyError, ValueError, Roommate.DoesNotExist):
+        return HttpResponseBadRequest("Choose a valid roommate and week")
+    if requested_with == selected_person or week_owner(requester_week) != selected_person:
+        return HttpResponseForbidden("You can only swap your own week")
+    requested_week = next(
+        (requester_week + timedelta(weeks=offset) for offset in range(1, 9)
+         if week_owner(requester_week + timedelta(weeks=offset)) == requested_with), None
+    )
+    if not requested_week:
+        return HttpResponseBadRequest("No upcoming week was found for that roommate")
+    conflict = RotaSwap.objects.filter(status__in=[RotaSwap.Status.PENDING, RotaSwap.Status.ACCEPTED]).filter(
+        Q(requester_week__in=[requester_week, requested_week]) |
+        Q(requested_week__in=[requester_week, requested_week])
+    ).exists()
+    if not conflict:
+        RotaSwap.objects.create(requested_by=selected_person, requested_with=requested_with,
+                                requester_week=requester_week, requested_week=requested_week)
+    return redirect(request.POST.get("next", "/"))
+
+
+@require_POST
+def respond_swap(request, swap_id):
+    selected_person = Roommate.objects.filter(pk=request.session.get("roommate_id"), active=True).first()
+    swap = RotaSwap.objects.filter(pk=swap_id, status=RotaSwap.Status.PENDING).first()
+    if not selected_person or not swap or swap.requested_with != selected_person:
+        return HttpResponseForbidden("Only the requested roommate can answer this swap")
+    decision = request.POST.get("decision")
+    if decision not in {RotaSwap.Status.ACCEPTED, RotaSwap.Status.DECLINED}:
+        return HttpResponseBadRequest("Choose accept or decline")
+    if decision == RotaSwap.Status.ACCEPTED:
+        overlap = RotaSwap.objects.filter(status=RotaSwap.Status.ACCEPTED).filter(
+            Q(requester_week__in=[swap.requester_week, swap.requested_week]) |
+            Q(requested_week__in=[swap.requester_week, swap.requested_week])
+        ).exists()
+        if overlap:
+            return HttpResponseBadRequest("One of these weeks has already been swapped")
+    swap.status = decision
+    swap.responded_at = timezone.now()
+    swap.save(update_fields=["status", "responded_at"])
     return redirect(request.POST.get("next", "/"))
 
 
@@ -137,7 +217,7 @@ def household_settings(request):
 
 def calendar_download(request):
     week_start = _requested_week(request)
-    person_id = request.GET.get("person") or request.session.get("roommate_id")
+    person_id = request.session.get("roommate_id")
     person = Roommate.objects.filter(pk=person_id, active=True).first()
     if not person:
         return HttpResponseBadRequest("Choose who you are before downloading a calendar")

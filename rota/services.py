@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from .models import Chore, Roommate, RotaSettings
+from django.db import models
+
+from .models import Chore, Roommate, RotaSettings, RotaSwap
 
 
 @dataclass
@@ -35,7 +37,7 @@ def build_week(week_start):
     return sorted(items, key=lambda item: (item.date, item.chore.name))
 
 
-def week_owner(week_start, roommates=None):
+def base_week_owner(week_start, roommates=None):
     roommates = roommates or list(Roommate.objects.filter(active=True).order_by("name"))
     if not roommates:
         return None
@@ -48,3 +50,13 @@ def week_owner(week_start, roommates=None):
         starting_index = 0
     rotation = (starting_index + ((monday_for(week_start) - anchor).days // 7)) % len(roommates)
     return roommates[rotation]
+
+
+def week_owner(week_start, roommates=None):
+    week_start = monday_for(week_start)
+    swap = RotaSwap.objects.filter(status=RotaSwap.Status.ACCEPTED).filter(
+        models.Q(requester_week=week_start) | models.Q(requested_week=week_start)
+    ).first()
+    if swap:
+        return swap.requested_with if swap.requester_week == week_start else swap.requested_by
+    return base_week_owner(week_start, roommates)

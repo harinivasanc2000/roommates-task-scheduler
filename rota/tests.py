@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django.test import TestCase
 from django.urls import reverse
-from .models import Chore, Roommate, RotaSettings, TaskStatus
+from .models import Chore, Roommate, RotaSettings, RotaSwap, TaskStatus
 from .services import build_week, week_owner
 
 
@@ -13,6 +13,9 @@ class RotaTests(TestCase):
         RotaSettings.objects.update_or_create(pk=1, defaults={
             "rotation_start": date(2026, 8, 24), "starting_roommate": None,
         })
+
+    def choose(self, person, pin="1234"):
+        return self.client.post(reverse("rota:choose_person"), {"roommate_id": person.id, "pin": pin})
 
     def test_week_is_monday_to_sunday_and_trash_is_alternate_days(self):
         items = build_week(date(2026, 8, 26))
@@ -44,7 +47,8 @@ class RotaTests(TestCase):
         self.assertContains(response, "Change the look")
         self.assertContains(response, "Continue without choosing")
         alex = Roommate.objects.get(name="Alex")
-        calendar = self.client.get(reverse("rota:calendar"), {"week": "2026-08-24", "person": alex.id})
+        self.choose(alex)
+        calendar = self.client.get(reverse("rota:calendar"), {"week": "2026-08-24", "person": Roommate.objects.get(name="Zara").id})
         self.assertEqual(calendar["Content-Type"], "text/calendar; charset=utf-8")
         self.assertIn(b"BEGIN:VCALENDAR", calendar.content)
         self.assertIn(b"Alex", calendar.content)
@@ -52,13 +56,21 @@ class RotaTests(TestCase):
 
     def test_identity_choice_is_remembered(self):
         alex = Roommate.objects.get(name="Alex")
-        response = self.client.post(reverse("rota:choose_person"), {"roommate_id": alex.id})
+        response = self.choose(alex)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.client.session["roommate_id"], alex.id)
         self.assertContains(self.client.get(reverse("rota:schedule")), "HELLO, ALEX")
 
-    def test_anyone_can_record_task_completion_and_note(self):
+    def test_existing_identity_rejects_the_wrong_pin(self):
+        alex = Roommate.objects.get(name="Alex")
+        self.choose(alex, "1234")
+        self.client.cookies.clear()
+        response = self.choose(alex, "9999")
+        self.assertEqual(response.status_code, 403)
+
+    def test_roommate_can_record_their_own_completion_and_note(self):
         item = build_week(date(2026, 8, 24))[0]
+        self.choose(item.roommate)
         response = self.client.post(reverse("rota:update_task"), {
             "task_date": item.date.isoformat(), "chore_id": item.chore.id,
             "roommate_id": item.roommate.id, "completed": "true", "note": "Bin bags are under the sink.",
@@ -69,3 +81,43 @@ class RotaTests(TestCase):
         self.assertTrue(status.completed)
         self.assertEqual(status.note, "Bin bags are under the sink.")
         self.assertEqual(status.scheduled_for, date(2026, 8, 26))
+
+    def test_roommate_cannot_change_another_persons_task(self):
+        item = build_week(date(2026, 8, 24))[0]
+        zara = Roommate.objects.get(name="Zara")
+        self.choose(zara)
+        response = self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(), "chore_id": item.chore.id,
+            "roommate_id": item.roommate.id, "completed": "true",
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(TaskStatus.objects.exists())
+
+    def test_completion_progress_does_not_carry_to_next_roommate(self):
+        alex = Roommate.objects.get(name="Alex")
+        item = build_week(date(2026, 8, 24))[0]
+        self.choose(alex)
+        self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(), "chore_id": item.chore.id,
+            "roommate_id": alex.id, "completed": "true",
+        })
+        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        self.assertGreater(response.context["weeks"][0]["percent"], 0)
+        self.assertEqual(response.context["weeks"][1]["percent"], 0)
+
+    def test_swap_requires_target_confirmation_and_exchanges_weeks(self):
+        alex = Roommate.objects.get(name="Alex")
+        zara = Roommate.objects.get(name="Zara")
+        self.choose(alex)
+        self.client.post(reverse("rota:request_swap"), {
+            "requester_week": "2026-08-24", "requested_with": zara.id,
+        })
+        swap = RotaSwap.objects.get()
+        self.assertEqual(swap.status, RotaSwap.Status.PENDING)
+        self.assertEqual(week_owner(date(2026, 8, 24)), alex)
+        self.choose(zara, "5678")
+        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        self.assertContains(response, "Rota swap requests")
+        self.client.post(reverse("rota:respond_swap", args=[swap.id]), {"decision": "accepted"})
+        self.assertEqual(week_owner(date(2026, 8, 24)), zara)
+        self.assertEqual(week_owner(date(2026, 8, 31)), alex)

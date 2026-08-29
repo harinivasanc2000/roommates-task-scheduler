@@ -25,6 +25,7 @@ class Roommate(models.Model):
     email = models.EmailField(blank=True)
     avatar = models.CharField(max_length=8, default="🙂")
     greeting = models.CharField(max_length=240, blank=True)
+    pin_hash = models.CharField(max_length=128, blank=True)
     active = models.BooleanField(default=True)
 
     class Meta:
@@ -71,3 +72,24 @@ class TaskStatus(models.Model):
 
     def __str__(self):
         return f"{self.chore} on {self.task_date}"
+
+
+class RotaSwap(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        DECLINED = "declined", "Declined"
+
+    requested_by = models.ForeignKey(Roommate, on_delete=models.CASCADE, related_name="sent_swaps")
+    requested_with = models.ForeignKey(Roommate, on_delete=models.CASCADE, related_name="received_swaps")
+    requester_week = models.DateField()
+    requested_week = models.DateField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.requested_by} ↔ {self.requested_with} ({self.status})"

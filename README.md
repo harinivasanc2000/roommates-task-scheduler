@@ -17,9 +17,12 @@ The saved starting point is Monday 31 August 2026 with Huanlin. This makes the p
 - One clearly identified owner for every Monday–Sunday week.
 - Editable alphabetical rotation starting date and person.
 - Personal identity picker remembered in the browser session.
+- Per-roommate 4-digit PIN protection; PINs are hashed before storage.
 - Personal greetings, characters, and highlighted rota weeks.
 - Clear task completion buttons and weekly progress bars.
 - Shared task notes and rescheduling within the assigned week.
+- Server-enforced ownership: only the assigned roommate can complete, move, or annotate their tasks.
+- Whole-week swap requests with recipient notifications and explicit accept or decline.
 - Personal `.ics` downloads containing only the selected roommate's tasks.
 - Public household management—no Django admin account required.
 - Add, pause, and reactivate roommates and chores from the website.
