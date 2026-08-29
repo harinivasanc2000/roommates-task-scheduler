@@ -76,6 +76,27 @@ class RotaTests(TestCase):
         self.assertEqual(status.note, "Bin bags are under the sink.")
         self.assertEqual(status.scheduled_for, date(2026, 8, 26))
 
+    def test_next_task_card_advances_after_completion(self):
+        alex = Roommate.objects.get(name="Alex")
+        self.choose(alex)
+        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        first_task = response.context["next_task"]
+        self.assertEqual(first_task.roommate, alex)
+        self.assertFalse(first_task.completed)
+        self.assertContains(response, "UP NEXT FOR YOU")
+
+        self.client.post(reverse("rota:update_task"), {
+            "task_date": first_task.original_date.isoformat(),
+            "chore_id": first_task.chore.id,
+            "roommate_id": alex.id,
+            "completed": "true",
+        })
+        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        self.assertNotEqual(
+            (response.context["next_task"].original_date, response.context["next_task"].chore.id),
+            (first_task.original_date, first_task.chore.id),
+        )
+
     def test_roommate_cannot_change_another_persons_task(self):
         item = build_week(date(2026, 8, 24))[0]
         zara = Roommate.objects.get(name="Zara")

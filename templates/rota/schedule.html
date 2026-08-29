@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="{% static 'rota/swaps.css' %}">
   <link rel="stylesheet" href="{% static 'rota/swap-status.css' %}">
   <link rel="stylesheet" href="{% static 'rota/fun.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/next-task.css' %}">
 </head>
 <body data-theme="pearl">
 <main>
@@ -39,6 +40,26 @@
   </section>
 
   {% if messages %}<section class="celebrations" aria-live="polite">{% for message in messages %}<div><span>✨</span><strong>{{ message }}</strong><button type="button" onclick="this.parentElement.remove()" aria-label="Dismiss">×</button></div>{% endfor %}</section>{% endif %}
+
+  {% if selected_person %}
+  <section class="next-task-panel" aria-labelledby="next-task-heading">
+    {% if next_task %}
+    <div class="next-task-date"><span>{{ next_task.date|date:"D" }}</span><strong>{{ next_task.date|date:"j" }}</strong><small>{{ next_task.date|date:"M" }}</small></div>
+    <div class="next-task-copy">
+      <span class="kicker">UP NEXT FOR YOU</span>
+      <h2 id="next-task-heading">{{ next_task.chore.name }}</h2>
+      <p>{{ selected_person.avatar }} {{ remaining_personal_tasks }} task{{ remaining_personal_tasks|pluralize }} left across your visible rota.</p>
+      {% if next_task.note %}<small class="next-task-note">“{{ next_task.note }}”</small>{% endif %}
+    </div>
+    <div class="next-task-actions">
+      <form method="post" action="{% url 'rota:update_task' %}">{% csrf_token %}<input type="hidden" name="task_date" value="{{ next_task.original_date|date:'Y-m-d' }}"><input type="hidden" name="chore_id" value="{{ next_task.chore.id }}"><input type="hidden" name="roommate_id" value="{{ next_task.roommate.id }}"><input type="hidden" name="completed" value="true"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="next-task-done">✓ Mark it done</button></form>
+      <button class="next-task-move" type="button" onclick="openTask(this)" data-date="{{ next_task.original_date|date:'Y-m-d' }}" data-scheduled="{{ next_task.date|date:'Y-m-d' }}" data-chore="{{ next_task.chore.id }}" data-roommate="{{ next_task.roommate.id }}" data-task="{{ next_task.chore.name|escapejs }}" data-note="{{ next_task.note|escapejs }}">Move or add note</button>
+    </div>
+    {% else %}
+    <div class="next-task-clear"><span>🎉</span><div><span class="kicker">ALL CAUGHT UP</span><h2 id="next-task-heading">Nothing waiting for you</h2><p>Your visible rota is sparkling. Enjoy the breathing room.</p></div></div>
+    {% endif %}
+  </section>
+  {% endif %}
 
   {% if incoming_swaps %}<section class="notifications"><span class="kicker">ACTION NEEDED</span><h2>Rota swap requests</h2>{% for swap in incoming_swaps %}<article class="swap-notice"><div><strong>{{ swap.requested_by.avatar }} {{ swap.requested_by.name }} wants to swap weeks</strong><p>You would take their week starting {{ swap.requester_week|date:"j M" }}, and they would take yours starting {{ swap.requested_week|date:"j M" }}.</p></div><form method="post" action="{% url 'rota:respond_swap' swap.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button name="decision" value="declined" class="decline-button">Decline</button><button name="decision" value="accepted" class="accept-button">Accept swap</button></form></article>{% endfor %}</section>{% endif %}
   {% if sent_swaps %}<section class="swap-statuses"><span class="kicker">YOUR SWAP REQUESTS</span>{% for swap in sent_swaps %}<article><span>{{ swap.requested_with.avatar }}</span><div><strong>Swap with {{ swap.requested_with.name }}</strong><small>{{ swap.requester_week|date:"j M" }} ↔ {{ swap.requested_week|date:"j M" }}</small></div><b class="status-{{ swap.status }}">{{ swap.get_status_display }}</b></article>{% endfor %}</section>{% endif %}

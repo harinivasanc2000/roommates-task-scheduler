@@ -55,6 +55,14 @@ def schedule(request):
                       "done": done, "total": len(week_items),
                       "percent": round((done / len(week_items)) * 100) if week_items else 0})
     personal_week = next((week for week in weeks if week["is_mine"]), None)
+    personal_items = sorted(
+        (item for item in all_items if selected_person and item.roommate == selected_person and not item.completed),
+        key=lambda item: (item.date, item.chore.name),
+    )
+    today = date.today()
+    next_task = next((item for item in personal_items if item.date >= today), None)
+    if next_task is None and personal_items:
+        next_task = personal_items[0]
     incoming_swaps = RotaSwap.objects.none()
     sent_swaps = RotaSwap.objects.none()
     if selected_person:
@@ -72,6 +80,8 @@ def schedule(request):
         "selected_person": selected_person,
         "needs_identity": selected_person is None,
         "personal_week": personal_week,
+        "next_task": next_task,
+        "remaining_personal_tasks": len(personal_items),
         "incoming_swaps": incoming_swaps,
         "sent_swaps": sent_swaps,
     })
