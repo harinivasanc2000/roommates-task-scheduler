@@ -11,4 +11,5 @@ urlpatterns = [
     path("swap/request/", views.request_swap, name="request_swap"),
     path("swap/<int:swap_id>/respond/", views.respond_swap, name="respond_swap"),
     path("notes/", views.household_note, name="household_note"),
+    path("tasks/complete-today/", views.bulk_complete_today, name="bulk_complete_today"),
 ]
