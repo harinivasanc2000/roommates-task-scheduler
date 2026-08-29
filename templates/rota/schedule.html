@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="{% static 'rota/swap-status.css' %}">
   <link rel="stylesheet" href="{% static 'rota/fun.css' %}">
 </head>
-<body data-theme="pearl">
+<body data-theme="midnight">
 <main>
   <header class="topbar">
     <a class="brand" href="/"><span class="brand-mark">✦</span><span>homeflow<small>shared home</small></span></a>
@@ -96,7 +96,7 @@
 
 <script>
 const body=document.body;
-const appearance={theme:localStorage.getItem('homeflow-theme')||'pearl',accent:localStorage.getItem('homeflow-accent')||'',density:localStorage.getItem('homeflow-density')||'comfortable'};
+const appearance={theme:localStorage.getItem('homeflow-theme')||'midnight',accent:localStorage.getItem('homeflow-accent')||'',density:localStorage.getItem('homeflow-density')||'comfortable'};
 function applyAppearance(){body.dataset.theme=appearance.theme;body.dataset.density=appearance.density;if(appearance.accent){body.style.setProperty('--accent',appearance.accent)}else{body.style.removeProperty('--accent')}document.querySelectorAll('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===appearance.theme));document.querySelectorAll('[data-accent]').forEach(b=>b.classList.toggle('selected',b.dataset.accent===appearance.accent));document.querySelectorAll('[data-density]').forEach(b=>b.classList.toggle('selected',b.dataset.density===appearance.density))}
 document.querySelectorAll('[data-theme-choice]').forEach(b=>b.onclick=()=>{appearance.theme=b.dataset.themeChoice;localStorage.setItem('homeflow-theme',appearance.theme);applyAppearance()});
 document.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>{appearance.accent=b.dataset.accent;localStorage.setItem('homeflow-accent',appearance.accent);applyAppearance()});
