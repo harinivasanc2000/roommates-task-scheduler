@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.db.models import Q
-from django.contrib.auth.hashers import check_password, make_password
+from django.contrib import messages
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -81,15 +81,6 @@ def choose_person(request):
     person = Roommate.objects.filter(pk=request.POST.get("roommate_id"), active=True).first()
     if not person:
         return HttpResponseBadRequest("Choose an active roommate")
-    pin = request.POST.get("pin", "")
-    if person.pin_hash:
-        if not check_password(pin, person.pin_hash):
-            return HttpResponseForbidden("That PIN is not correct")
-    else:
-        if len(pin) != 4 or not pin.isdigit():
-            return HttpResponseBadRequest("Create a 4-digit PIN for this roommate")
-        person.pin_hash = make_password(pin)
-        person.save(update_fields=["pin_hash"])
     request.session["roommate_id"] = person.id
     return redirect(request.POST.get("next", "/"))
 
@@ -112,6 +103,15 @@ def update_task(request):
     status, _ = TaskStatus.objects.get_or_create(task_date=task_date, chore=chore, roommate=roommate)
     if "completed" in request.POST:
         status.completed = request.POST["completed"] == "true"
+        if status.completed:
+            celebrations = {
+                "hari": f"Woof-tastic, Hari! 🐶 You smashed {chore.name}!",
+                "huanlin": f"太棒了，Huanlin！🦁 {chore.name} 完成啦！",
+                "hualin": f"太棒了，Hualin！🦁 {chore.name} 完成啦！",
+                "jaclyn": f"Beauty, Jaclyn! 🦘 {chore.name} is done and dusted!",
+                "tanith": f"Purr-fect, Tanith! 🐱 Cooper approves of that {chore.name}!",
+            }
+            messages.success(request, celebrations.get(roommate.name.lower(), f"Nice work, {roommate.name}! ✨ {chore.name} is done."))
     if "note" in request.POST:
         status.note = request.POST["note"].strip()
     if "scheduled_for" in request.POST:

@@ -14,8 +14,8 @@ class RotaTests(TestCase):
             "rotation_start": date(2026, 8, 24), "starting_roommate": None,
         })
 
-    def choose(self, person, pin="1234"):
-        return self.client.post(reverse("rota:choose_person"), {"roommate_id": person.id, "pin": pin})
+    def choose(self, person):
+        return self.client.post(reverse("rota:choose_person"), {"roommate_id": person.id})
 
     def test_week_is_monday_to_sunday_and_trash_is_alternate_days(self):
         items = build_week(date(2026, 8, 26))
@@ -61,13 +61,6 @@ class RotaTests(TestCase):
         self.assertEqual(self.client.session["roommate_id"], alex.id)
         self.assertContains(self.client.get(reverse("rota:schedule")), "HELLO, ALEX")
 
-    def test_existing_identity_rejects_the_wrong_pin(self):
-        alex = Roommate.objects.get(name="Alex")
-        self.choose(alex, "1234")
-        self.client.cookies.clear()
-        response = self.choose(alex, "9999")
-        self.assertEqual(response.status_code, 403)
-
     def test_roommate_can_record_their_own_completion_and_note(self):
         item = build_week(date(2026, 8, 24))[0]
         self.choose(item.roommate)
@@ -104,6 +97,9 @@ class RotaTests(TestCase):
         response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
         self.assertGreater(response.context["weeks"][0]["percent"], 0)
         self.assertEqual(response.context["weeks"][1]["percent"], 0)
+        self.assertContains(response, "Nice work, Alex!")
+        self.assertContains(response, "Zara’s rota")
+        self.assertContains(response, "Their tasks and progress are private to their view")
 
     def test_swap_requires_target_confirmation_and_exchanges_weeks(self):
         alex = Roommate.objects.get(name="Alex")
@@ -115,7 +111,7 @@ class RotaTests(TestCase):
         swap = RotaSwap.objects.get()
         self.assertEqual(swap.status, RotaSwap.Status.PENDING)
         self.assertEqual(week_owner(date(2026, 8, 24)), alex)
-        self.choose(zara, "5678")
+        self.choose(zara)
         response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
         self.assertContains(response, "Rota swap requests")
         self.client.post(reverse("rota:respond_swap", args=[swap.id]), {"decision": "accepted"})

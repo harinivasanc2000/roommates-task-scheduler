@@ -25,7 +25,6 @@ class Roommate(models.Model):
     email = models.EmailField(blank=True)
     avatar = models.CharField(max_length=8, default="🙂")
     greeting = models.CharField(max_length=240, blank=True)
-    pin_hash = models.CharField(max_length=128, blank=True)
     active = models.BooleanField(default=True)
 
     class Meta:
