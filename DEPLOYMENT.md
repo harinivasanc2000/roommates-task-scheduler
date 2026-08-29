@@ -25,6 +25,12 @@ The repository already includes Gunicorn, PostgreSQL support, WhiteNoise static-
 
 After that, each push to `main` can deploy automatically. Use a persistent PostgreSQL plan before relying on the app's task history; local SQLite files on a normal web service do not survive deployments.
 
+## Availability and free-tier limits
+
+Your own computer does not need to stay on; Render runs the application from its servers. On Render's Free plan, the web service sleeps after 15 minutes without traffic and the first visitor may wait about a minute while it wakes. The Free PostgreSQL database expires after 30 days.
+
+For dependable household use, upgrade the PostgreSQL database to a persistent paid plan. If you also want immediate responses at all times, upgrade the web service from Free to a paid compute plan. GitHub pushes can still deploy automatically on either plan.
+
 ## Production checklist
 
 - Keep `.env` and database credentials out of Git.

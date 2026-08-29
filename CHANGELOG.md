@@ -48,3 +48,13 @@ This file is an append-only history of Homeflow. Do not delete, rewrite, reorder
 - Increased the visual emphasis of personal weeks and dimmed other weeks into read-only context.
 - Isolated completion progress by owner and week and added regression coverage for the previous carry-over issue.
 - Expanded the automated test suite to ten tests.
+
+## 0.4.1 — 2026-08-29 — `154b45e`
+
+- Removed roommate PINs and restored frictionless one-tap identity selection.
+- Kept server-side task ownership checks tied to the selected browser session.
+- Collapsed other roommates' weeks so their tasks and progress do not distract from the current person.
+- Removed other roommates' completion percentages from the current person's dashboard.
+- Made the selected roommate's next rota the primary overview and strengthened its calendar highlight.
+- Added animated, character-specific completion celebrations for Hari, Huanlin, Jaclyn, and Tanith.
+- Added regression assertions for separate progress and private task overviews.
