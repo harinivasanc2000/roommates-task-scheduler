@@ -2,14 +2,9 @@
 
 Homeflow is a mobile-first Django web app for managing a shared Monday–Sunday household rota. One roommate owns the complete rota for a week, then responsibility passes to the next active roommate alphabetically.
 
-## Current household setup
 
-- 🐶 Hari — personalised puppy greeting
-- 🦁 Huanlin — personalised Chinese greeting
-- 🦘 Jaclyn — personalised Australian greeting
-- 🐱 Tanith — personalised greeting featuring Cooper
 
-The saved starting point is Monday 31 August 2026 with Huanlin. This makes the preceding week Hari's week. Anyone in the household can change the starting Monday and starting person from **Rota start** on desktop or **↻** on mobile.
+
 
 ## Features
 
