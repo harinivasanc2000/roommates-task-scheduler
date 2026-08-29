@@ -107,3 +107,17 @@ class CelebrationCounter(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["roommate", "chore"], name="one_celebration_counter")]
+
+
+class HouseholdNote(models.Model):
+    """Shared sticky notes / announcements visible to the whole household."""
+    author = models.ForeignKey(Roommate, on_delete=models.CASCADE, related_name="notes")
+    body = models.CharField(max_length=280)
+    pinned = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-pinned", "-created_at"]
+
+    def __str__(self):
+        return self.body[:40]
