@@ -36,3 +36,15 @@ This file is an append-only history of Homeflow. Do not delete, rewrite, reorder
 - Added an always-visible close button to the identity picker.
 - Added options to continue without choosing or open household management directly.
 - Added regression coverage for the identity-popup escape path.
+
+## 0.4.0 — 2026-08-29 — `9c34b5c`
+
+- Enforced task ownership on the server so roommates can only complete, move, or annotate their own assigned tasks.
+- Added hashed 4-digit roommate PINs to protect identity switching.
+- Added persistent whole-week swap requests with recipient notifications.
+- Added recipient-only accept and decline actions; rotas change only after acceptance.
+- Added requester-facing pending, accepted, and declined swap statuses.
+- Made the selected roommate's next rota and progress the dashboard focus.
+- Increased the visual emphasis of personal weeks and dimmed other weeks into read-only context.
+- Isolated completion progress by owner and week and added regression coverage for the previous carry-over issue.
+- Expanded the automated test suite to ten tests.
