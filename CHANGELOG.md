@@ -58,3 +58,12 @@ This file is an append-only history of Homeflow. Do not delete, rewrite, reorder
 - Made the selected roommate's next rota the primary overview and strengthened its calendar highlight.
 - Added animated, character-specific completion celebrations for Hari, Huanlin, Jaclyn, and Tanith.
 - Added regression assertions for separate progress and private task overviews.
+
+## 0.5.0 — 2026-08-29 — `65f1345`
+
+- Added 72 task-aware celebration messages: three variants for every starter chore and each of the four roommates.
+- Gave Hari puppy-themed encouragement, Huanlin Chinese encouragement, Jaclyn light Australian humour, and Tanith cat/Cooper and South African touches.
+- Added persistent per-roommate, per-chore celebration counters.
+- Made repeat completions rotate through different messages instead of repeating the first line.
+- Kept celebration sequences independent between roommates and chores.
+- Added catalogue completeness and non-repetition regression tests, bringing the suite to eleven tests.
