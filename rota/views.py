@@ -8,9 +8,17 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import CelebrationCounter, Chore, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
+from .models import CelebrationCounter, Chore, HouseholdNote, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
 from .celebrations import celebration_for
-from .services import build_week, monday_for, week_owner
+from .services import (
+    available_roommates,
+    build_week,
+    fairness_board,
+    monday_for,
+    personal_stats,
+    recent_activity,
+    week_owner,
+)
 
 
 def _requested_week(request):
@@ -32,15 +40,21 @@ def schedule(request):
         all_items.extend(build_week(start))
     statuses = {
         (status.task_date, status.chore_id, status.roommate_id): status
-        for status in TaskStatus.objects.filter(task_date__gte=week_start, task_date__lte=week_start + timedelta(days=34))
+        for status in TaskStatus.objects.filter(
+            task_date__gte=week_start, task_date__lte=week_start + timedelta(days=34)
+        )
     }
+    today = date.today()
     for item in all_items:
         item.status = statuses.get((item.date, item.chore.id, item.roommate.id))
         item.original_date = item.date
         item.completed = item.status.completed if item.status else False
+        item.skipped = item.status.skipped if item.status else False
         item.note = item.status.note if item.status else ""
         if item.status and item.status.scheduled_for:
             item.date = item.status.scheduled_for
+        item.is_overdue = (not item.completed) and item.date < today
+
     for week_offset in range(5):
         start = week_start + timedelta(days=week_offset * 7)
         week_items = [item for item in all_items if start <= item.date < start + timedelta(days=7)]
@@ -50,24 +64,46 @@ def schedule(request):
             days.append({"date": day, "items": [item for item in week_items if item.date == day]})
         done = sum(item.completed for item in week_items)
         owner = week_owner(start)
-        weeks.append({"start": start, "end": start + timedelta(days=6), "days": days,
-                      "owner": owner, "is_mine": bool(selected_person and owner == selected_person),
-                      "done": done, "total": len(week_items),
-                      "percent": round((done / len(week_items)) * 100) if week_items else 0})
+        weeks.append({
+            "start": start,
+            "end": start + timedelta(days=6),
+            "days": days,
+            "owner": owner,
+            "is_mine": bool(selected_person and owner == selected_person),
+            "done": done,
+            "total": len(week_items),
+            "percent": round((done / len(week_items)) * 100) if week_items else 0,
+        })
+
     personal_week = next((week for week in weeks if week["is_mine"]), None)
     personal_items = sorted(
-        (item for item in all_items if selected_person and item.roommate == selected_person and not item.completed),
-        key=lambda item: (item.date, item.chore.name),
+        (
+            item for item in all_items
+            if selected_person
+            and item.roommate == selected_person
+            and not item.completed
+            and not item.skipped
+        ),
+        key=lambda item: (
+            0 if item.is_overdue else 1,
+            item.date,
+            item.chore.name,
+        ),
     )
-    today = date.today()
-    next_task = next((item for item in personal_items if item.date >= today), None)
+    next_task = next((item for item in personal_items if item.date >= today or item.is_overdue), None)
     if next_task is None and personal_items:
         next_task = personal_items[0]
+
     incoming_swaps = RotaSwap.objects.none()
     sent_swaps = RotaSwap.objects.none()
+    stats = None
     if selected_person:
-        incoming_swaps = RotaSwap.objects.filter(requested_with=selected_person, status=RotaSwap.Status.PENDING)
+        incoming_swaps = RotaSwap.objects.filter(
+            requested_with=selected_person, status=RotaSwap.Status.PENDING
+        )
         sent_swaps = RotaSwap.objects.filter(requested_by=selected_person)[:3]
+        stats = personal_stats(selected_person, all_items, statuses, today)
+
     return render(request, "rota/schedule.html", {
         "weeks": weeks,
         "week_start": week_start,
@@ -84,6 +120,18 @@ def schedule(request):
         "remaining_personal_tasks": len(personal_items),
         "incoming_swaps": incoming_swaps,
         "sent_swaps": sent_swaps,
+        "stats": stats,
+        "fairness": fairness_board(),
+        "activity": recent_activity(),
+        "today": today,
+        "household_notes": HouseholdNote.objects.select_related("author")[:12],
+        "note_presets": [
+            "Bin bags under the sink",
+            "Cleaning spray is low",
+            "Please leave the dryer empty",
+            "Done before 8pm works best",
+            "Shared supplies in the hallway cupboard",
+        ],
     })
 
 
@@ -120,14 +168,26 @@ def update_task(request):
             counter.save(update_fields=["count"])
             messages.success(request, celebration_for(roommate, chore, counter.count))
         status.completed = marking_complete
+        if marking_complete:
+            status.skipped = False
+    if request.POST.get("skip") == "true":
+        status.skipped = True
+        current = status.scheduled_for or task_date
+        tomorrow = date.today() + timedelta(days=1)
+        week_start = monday_for(task_date)
+        week_end = week_start + timedelta(days=6)
+        if week_start <= tomorrow <= week_end and tomorrow > current:
+            status.scheduled_for = tomorrow
+        status.completed = False
     if "note" in request.POST:
         status.note = request.POST["note"].strip()
-    if "scheduled_for" in request.POST:
+    if "scheduled_for" in request.POST and request.POST.get("skip") != "true":
         scheduled_for = date.fromisoformat(request.POST["scheduled_for"])
         week_start = monday_for(task_date)
         if not week_start <= scheduled_for <= week_start + timedelta(days=6):
             return HttpResponseBadRequest("A task can only be moved within its assigned week")
         status.scheduled_for = scheduled_for
+        status.skipped = False
     status.save()
     return redirect(request.POST.get("next", "/"))
 
@@ -220,6 +280,44 @@ def household_settings(request):
         settings.rotation_start = rotation_start
         settings.starting_roommate = starting_roommate
         settings.save(update_fields=["rotation_start", "starting_roommate"])
+    elif action == "set_away":
+        person = Roommate.objects.filter(pk=request.POST.get("id")).first()
+        if person:
+            raw = request.POST.get("away_until", "").strip()
+            if raw:
+                try:
+                    person.away_until = date.fromisoformat(raw)
+                except ValueError:
+                    return HttpResponseBadRequest("Choose a valid away-until date")
+            else:
+                person.away_until = None
+            person.save(update_fields=["away_until"])
+    return redirect(request.POST.get("next", "/"))
+
+
+@require_POST
+def household_note(request):
+    selected_person = Roommate.objects.filter(pk=request.session.get("roommate_id"), active=True).first()
+    if not selected_person:
+        return HttpResponseForbidden("Choose who you are first")
+    action = request.POST.get("action", "add")
+    if action == "add":
+        body = request.POST.get("body", "").strip()[:280]
+        if body:
+            HouseholdNote.objects.create(
+                author=selected_person,
+                body=body,
+                pinned=request.POST.get("pinned") == "true",
+            )
+    elif action == "delete":
+        note = HouseholdNote.objects.filter(pk=request.POST.get("id")).first()
+        if note and note.author_id == selected_person.id:
+            note.delete()
+    elif action == "toggle_pin":
+        note = HouseholdNote.objects.filter(pk=request.POST.get("id")).first()
+        if note:
+            note.pinned = not note.pinned
+            note.save(update_fields=["pinned"])
     return redirect(request.POST.get("next", "/"))
 
 
@@ -247,7 +345,7 @@ def calendar_download(request):
             f"SUMMARY:{summary}", "END:VEVENT",
         ]
     lines.append("END:VCALENDAR")
-    response = HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/calendar; charset=utf-8")
+    response = HttpResponse("\\r\\n".join(lines) + "\\r\\n", content_type="text/calendar; charset=utf-8")
     safe_name = "".join(character for character in person.name.lower() if character.isalnum())
     response["Content-Disposition"] = f'attachment; filename="{safe_name}-rota-{week_start}.ics"'
     return response
