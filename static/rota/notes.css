@@ -1,0 +1,59 @@
+/* Household notes board */
+.notes-board{margin:18px 3px 10px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:0 10px 28px color-mix(in srgb,var(--ink) 4%,transparent)}
+.notes-head{margin-bottom:12px}
+.notes-head h2{margin:4px 0;font-size:22px}
+.notes-sub{margin:0;color:var(--muted);font-size:14px}
+.note-composer{display:grid;gap:10px;margin-bottom:16px}
+.note-composer textarea{width:100%;min-height:72px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--accent) 4%,var(--bg));color:var(--ink);font:inherit;resize:vertical}
+.note-composer-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pin-toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.sticky-note{position:relative;padding:14px 14px 12px;border-radius:16px;background:linear-gradient(160deg,#fff8c9,color-mix(in srgb,#ffe9a0 70%,var(--surface)));border:1px solid color-mix(in srgb,#e2c35a 35%,var(--line));box-shadow:0 8px 18px color-mix(in srgb,#c9a227 12%,transparent);transform:rotate(-0.4deg);transition:transform .15s ease,box-shadow .15s ease}
+.sticky-note:nth-child(2n){transform:rotate(0.5deg);background:linear-gradient(160deg,#e8f6ff,color-mix(in srgb,#cfe9ff 70%,var(--surface)));border-color:color-mix(in srgb,#7eb6e0 35%,var(--line))}
+.sticky-note:nth-child(3n){transform:rotate(-0.7deg);background:linear-gradient(160deg,#f3e9ff,color-mix(in srgb,#e4d2ff 70%,var(--surface)));border-color:color-mix(in srgb,#b08be0 35%,var(--line))}
+.sticky-note:hover{transform:rotate(0deg) translateY(-2px);box-shadow:0 12px 24px color-mix(in srgb,var(--ink) 10%,transparent)}
+.sticky-note.pinned{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.sticky-note p{margin:6px 0 12px;font-size:15px;line-height:1.45;color:var(--ink)}
+.sticky-note footer{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.pin-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--accent)}
+.note-actions{display:flex;gap:6px}
+.ghost-mini{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:4px 6px;border-radius:8px}
+.ghost-mini:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);color:var(--ink)}
+.ghost-mini.danger:hover{color:#c62828;background:color-mix(in srgb,#c62828 8%,transparent)}
+.notes-empty{grid-column:1/-1;display:flex;gap:14px;align-items:center;padding:18px;border-radius:16px;border:1px dashed var(--line);color:var(--muted)}
+.notes-empty span{font-size:28px}
+.notes-empty strong{display:block;color:var(--ink);margin-bottom:2px}
+.notes-empty p{margin:0}
+
+/* Task note presets + dialog polish */
+.task-dialog-rich .note-presets,.note-presets{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.preset-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:650;cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.preset-chip:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.note-hint{display:block;margin:4px 0 10px;color:var(--muted);font-size:12px}
+.note-preview{display:flex;align-items:flex-start;gap:6px;margin-top:6px;padding:6px 8px;border-radius:10px;background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--ink);font-size:12px;line-height:1.35}
+.note-icon{flex:0 0 auto}
+
+/* Today highlight */
+.day.is-today{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));background:color-mix(in srgb,var(--accent) 6%,var(--surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent)}
+.today-pill{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle}
+
+/* Celebration pop */
+.celebrate-pop>div{animation:celebrateIn .45s ease both}
+@keyframes celebrateIn{
+  0%{opacity:0;transform:translateY(-8px) scale(.96)}
+  60%{transform:translateY(2px) scale(1.02)}
+  100%{opacity:1;transform:none}
+}
+
+/* Soft section elevation for insight panels already present */
+.stats-strip article{transition:transform .15s ease,box-shadow .15s ease}
+.stats-strip article:hover{transform:translateY(-2px);box-shadow:0 10px 20px color-mix(in srgb,var(--ink) 6%,transparent)}
+
+@media(max-width:700px){
+  .notes-board{margin:14px 12px;padding:15px}
+  .notes-grid{grid-template-columns:1fr}
+  .sticky-note{transform:none}
+  .sticky-note:nth-child(n){transform:none}
+  .note-composer-actions{flex-direction:column;align-items:stretch}
+  .note-composer-actions .dark-button{width:100%}
+}
