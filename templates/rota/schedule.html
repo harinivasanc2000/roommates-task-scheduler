@@ -1,0 +1,91 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Homeflow — shared rota</title>
+  <link rel="stylesheet" href="{% static 'rota/style.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/polish.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/appearance.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/mobile.css' %}">
+</head>
+<body data-theme="pearl">
+<main>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">✦</span><span>homeflow<small>shared home</small></span></a>
+    <div class="top-actions">
+      <button class="identity-pill" type="button" onclick="document.getElementById('identity').showModal()">
+        {% if selected_person %}<span>{{ selected_person.avatar }}</span> {{ selected_person.name }}{% else %}Who are you?{% endif %}
+      </button>
+      <button class="ghost" id="theme-button" type="button" onclick="document.getElementById('appearance').showModal()">Change look</button>
+      <button class="dark-button" type="button" onclick="document.getElementById('setup').showModal()">Manage home</button>
+    </div>
+  </header>
+
+  <section class="hero personal-hero">
+    <div class="greeting-avatar">{% if selected_person %}{{ selected_person.avatar }}{% else %}🏠{% endif %}</div>
+    <div class="greeting-copy">
+      <p class="kicker">{% if selected_person %}HELLO, {{ selected_person.name|upper }}{% else %}WELCOME HOME{% endif %}</p>
+      <h1>{% if selected_person %}{{ selected_person.greeting|default:"Welcome back!" }}{% else %}Who’s checking<br>the rota?{% endif %}</h1>
+      <p class="intro">One person takes the complete Monday–Sunday rota. Check tasks off or move them to a better day—the whole house sees every update.</p>
+    </div>
+    {% with firstweek=weeks.0 %}<aside class="hero-card"><span>UPCOMING WEEK</span><strong>{{ firstweek.owner.avatar }} {{ firstweek.owner.name|default:"Add your household" }}</strong><p>{{ firstweek.start|date:"D j M" }} – {{ firstweek.end|date:"D j M" }}</p><div class="progress"><i style="width:{{ firstweek.percent }}%"></i></div><small>{{ firstweek.done }} of {{ firstweek.total }} tasks complete</small></aside>{% endwith %}
+  </section>
+
+  <section class="toolbar">
+    <div><a href="?week={{ previous_week|date:'Y-m-d' }}">← Earlier</a><b>Next 5 weeks</b><a href="?week={{ next_week|date:'Y-m-d' }}">Later →</a></div>
+    {% if selected_person %}<a class="calendar-link" href="{% url 'rota:calendar' %}?week={{ week_start|date:'Y-m-d' }}&person={{ selected_person.id }}">↓ Download {{ selected_person.name }}’s calendar</a>{% else %}<button class="calendar-link link-button" onclick="document.getElementById('identity').showModal()">Choose yourself to download your calendar</button>{% endif %}
+  </section>
+
+  <section class="calendar">
+    {% for week in weeks %}
+    <article class="week-card {% if selected_person.id == week.owner.id %}my-week{% endif %}">
+      <header class="week-header">
+        <div><span>WEEK {{ forloop.counter }}</span><h2>{{ week.start|date:"j M" }} – {{ week.end|date:"j M" }}</h2></div>
+        <div class="week-owner"><span>{% if selected_person.id == week.owner.id %}YOUR WEEK{% else %}THIS WEEK BELONGS TO{% endif %}</span><strong>{{ week.owner.avatar }} {{ week.owner.name|default:"—" }}</strong><div class="mini-progress"><i style="width:{{ week.percent }}%"></i></div><small>{{ week.percent }}% done</small></div>
+      </header>
+      <div class="days">
+        {% for day in week.days %}<section class="day"><header><span>{{ day.date|date:"D" }}</span><b>{{ day.date|date:"j" }}</b></header><div class="day-tasks">
+          {% for item in day.items %}<article class="task {% if item.completed %}complete{% endif %}">
+            <div class="task-copy"><strong>{{ item.chore.name }}</strong><span class="person">{{ item.roommate.avatar }} {{ item.roommate.name }}</span>{% if item.original_date != item.date %}<small class="moved">Moved from {{ item.original_date|date:"D" }}</small>{% endif %}{% if item.note %}<small class="note-preview">“{{ item.note }}”</small>{% endif %}</div>
+            <div class="task-actions">
+              <form method="post" action="{% url 'rota:update_task' %}">{% csrf_token %}<input type="hidden" name="task_date" value="{{ item.original_date|date:'Y-m-d' }}"><input type="hidden" name="chore_id" value="{{ item.chore.id }}"><input type="hidden" name="roommate_id" value="{{ item.roommate.id }}"><input type="hidden" name="completed" value="{% if item.completed %}false{% else %}true{% endif %}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="done-button">{% if item.completed %}✓ Done{% else %}○ Mark done{% endif %}</button></form>
+              <button class="move-button" type="button" onclick="openTask(this)" data-date="{{ item.original_date|date:'Y-m-d' }}" data-scheduled="{{ item.date|date:'Y-m-d' }}" data-chore="{{ item.chore.id }}" data-roommate="{{ item.roommate.id }}" data-task="{{ item.chore.name|escapejs }}" data-note="{{ item.note|escapejs }}">Move / note</button>
+            </div>
+          </article>{% empty %}<p class="empty">Free day</p>{% endfor %}
+        </div></section>{% endfor %}
+      </div>
+    </article>{% endfor %}
+  </section>
+</main>
+
+<dialog id="identity" class="identity-dialog">
+  <div class="modal-head"><div><span class="kicker">WELCOME TO HOMEFLOW</span><h2>Who are you?</h2></div>{% if not needs_identity %}<button type="button" onclick="this.closest('dialog').close()">×</button>{% endif %}</div>
+  <p class="modal-copy">Choose your character. We’ll remember you on this device and personalise your calendar.</p>
+  <div class="people-picker">{% for person in roommates %}{% if person.active %}<form method="post" action="{% url 'rota:choose_person' %}">{% csrf_token %}<input type="hidden" name="roommate_id" value="{{ person.id }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button><span>{{ person.avatar }}</span><strong>{{ person.name }}</strong></button></form>{% endif %}{% endfor %}</div>
+</dialog>
+
+<dialog id="task-dialog"><form method="post" action="{% url 'rota:update_task' %}">{% csrf_token %}<input name="task_date" type="hidden"><input name="chore_id" type="hidden"><input name="roommate_id" type="hidden"><input name="next" type="hidden" value="{{ request.get_full_path }}"><header><span class="kicker">CHANGE TASK</span><button type="button" onclick="this.closest('dialog').close()">×</button></header><h2 id="task-title">Task details</h2><label class="field-label">Move to another day this week</label><input class="date-input" name="scheduled_for" type="date" required><label class="field-label">Shared note</label><textarea name="note" placeholder="Anything your housemates should know?"></textarea><button class="dark-button wide-button">Save for everyone</button></form></dialog>
+
+<dialog id="appearance" class="appearance-dialog">
+  <div class="modal-head"><div><span class="kicker">MAKE IT YOURS</span><h2>Change the look</h2></div><button type="button" onclick="this.closest('dialog').close()">×</button></div>
+  <p class="modal-copy">These choices are personal to this device and update immediately.</p>
+  <section class="appearance-section"><h3>Theme</h3><div class="theme-picker"><button type="button" data-theme-choice="pearl"><i class="theme-preview pearl-preview"></i><strong>Pearl</strong><small>Bright & clean</small></button><button type="button" data-theme-choice="midnight"><i class="theme-preview midnight-preview"></i><strong>Midnight</strong><small>Easy on the eyes</small></button><button type="button" data-theme-choice="rose"><i class="theme-preview rose-preview"></i><strong>Rose</strong><small>Warm & playful</small></button></div></section>
+  <section class="appearance-section"><h3>Accent colour</h3><div class="accent-picker"><button type="button" data-accent="#ff5d50" style="--swatch:#ff5d50" aria-label="Coral"></button><button type="button" data-accent="#5678e9" style="--swatch:#5678e9" aria-label="Blue"></button><button type="button" data-accent="#18a278" style="--swatch:#18a278" aria-label="Green"></button><button type="button" data-accent="#a45de0" style="--swatch:#a45de0" aria-label="Purple"></button><button type="button" data-accent="#e39020" style="--swatch:#e39020" aria-label="Amber"></button></div></section>
+  <section class="appearance-section"><h3>Calendar spacing</h3><div class="segment-picker"><button type="button" data-density="comfortable">Comfortable</button><button type="button" data-density="compact">Compact</button></div></section>
+  <button class="dark-button wide-button" type="button" onclick="document.getElementById('appearance').close()">Done</button>
+</dialog>
+
+<dialog id="setup"><div class="modal-head"><div><span class="kicker">EVERYONE CAN EDIT</span><h2>Set up your home</h2></div><button type="button" onclick="this.closest('dialog').close()">×</button></div><p class="modal-copy">Tap a person or chore to pause it. Changes are shared immediately.</p><div class="settings-grid"><section><h3>Roommates</h3><div class="chips">{% for roommate in roommates %}<form method="post" action="{% url 'rota:household' %}" class="chip {% if not roommate.active %}off{% endif %}">{% csrf_token %}<input type="hidden" name="action" value="toggle_roommate"><input type="hidden" name="id" value="{{ roommate.id }}"><input type="hidden" name="active" value="{% if roommate.active %}false{% else %}true{% endif %}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button>{{ roommate.avatar }} {{ roommate.name }} {% if not roommate.active %}＋{% else %}×{% endif %}</button></form>{% endfor %}</div><form method="post" action="{% url 'rota:household' %}" class="add-form">{% csrf_token %}<input type="hidden" name="action" value="add_roommate"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="name" placeholder="Name" required><input name="email" type="email" placeholder="Email (optional)"><button>Add person</button></form></section><section><h3>Chores</h3><div class="chips">{% for chore in chores %}<form method="post" action="{% url 'rota:household' %}" class="chip {% if not chore.active %}off{% endif %}">{% csrf_token %}<input type="hidden" name="action" value="toggle_chore"><input type="hidden" name="id" value="{{ chore.id }}"><input type="hidden" name="active" value="{% if chore.active %}false{% else %}true{% endif %}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button>{{ chore.name }} {% if not chore.active %}＋{% else %}×{% endif %}</button></form>{% endfor %}</div><form method="post" action="{% url 'rota:household' %}" class="add-form">{% csrf_token %}<input type="hidden" name="action" value="add_chore"><input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="name" placeholder="New chore" required><select name="frequency"><option value="weekly">Weekly</option><option value="alternate_days">Every other day</option></select><select name="weekday"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select><button>Add chore</button></form></section></div></dialog>
+
+<script>
+const body=document.body;
+const appearance={theme:localStorage.getItem('homeflow-theme')||'pearl',accent:localStorage.getItem('homeflow-accent')||'',density:localStorage.getItem('homeflow-density')||'comfortable'};
+function applyAppearance(){body.dataset.theme=appearance.theme;body.dataset.density=appearance.density;if(appearance.accent){body.style.setProperty('--accent',appearance.accent)}else{body.style.removeProperty('--accent')}document.querySelectorAll('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===appearance.theme));document.querySelectorAll('[data-accent]').forEach(b=>b.classList.toggle('selected',b.dataset.accent===appearance.accent));document.querySelectorAll('[data-density]').forEach(b=>b.classList.toggle('selected',b.dataset.density===appearance.density))}
+document.querySelectorAll('[data-theme-choice]').forEach(b=>b.onclick=()=>{appearance.theme=b.dataset.themeChoice;localStorage.setItem('homeflow-theme',appearance.theme);applyAppearance()});
+document.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>{appearance.accent=b.dataset.accent;localStorage.setItem('homeflow-accent',appearance.accent);applyAppearance()});
+document.querySelectorAll('[data-density]').forEach(b=>b.onclick=()=>{appearance.density=b.dataset.density;localStorage.setItem('homeflow-density',appearance.density);applyAppearance()});applyAppearance();
+function openTask(button){const d=document.getElementById('task-dialog');d.querySelector('[name=task_date]').value=button.dataset.date;d.querySelector('[name=scheduled_for]').value=button.dataset.scheduled;d.querySelector('[name=chore_id]').value=button.dataset.chore;d.querySelector('[name=roommate_id]').value=button.dataset.roommate;d.querySelector('#task-title').textContent=button.dataset.task;d.querySelector('textarea').value=button.dataset.note;d.showModal()}
+{% if needs_identity %}document.getElementById('identity').showModal();{% endif %}
+</script>
+</body></html>
