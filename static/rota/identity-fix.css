@@ -1,0 +1,1 @@
+.identity-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}.no-people{grid-column:1/-1;padding:20px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center}@media(max-width:620px){.identity-actions{display:grid}.identity-actions button{min-height:44px}}

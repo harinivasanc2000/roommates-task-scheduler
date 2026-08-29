@@ -7,6 +7,7 @@ from .services import build_week, week_owner
 
 class RotaTests(TestCase):
     def setUp(self):
+        Roommate.objects.all().delete()
         Roommate.objects.create(name="Zara")
         Roommate.objects.create(name="Alex")
         RotaSettings.objects.update_or_create(pk=1, defaults={
@@ -41,6 +42,7 @@ class RotaTests(TestCase):
         response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
         self.assertContains(response, "Next 5 weeks")
         self.assertContains(response, "Change the look")
+        self.assertContains(response, "Continue without choosing")
         alex = Roommate.objects.get(name="Alex")
         calendar = self.client.get(reverse("rota:calendar"), {"week": "2026-08-24", "person": alex.id})
         self.assertEqual(calendar["Content-Type"], "text/calendar; charset=utf-8")

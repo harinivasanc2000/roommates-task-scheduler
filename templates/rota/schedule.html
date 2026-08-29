@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{% static 'rota/appearance.css' %}">
   <link rel="stylesheet" href="{% static 'rota/mobile.css' %}">
   <link rel="stylesheet" href="{% static 'rota/rotation.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/identity-fix.css' %}">
 </head>
 <body data-theme="pearl">
 <main>
@@ -62,9 +63,10 @@
 </main>
 
 <dialog id="identity" class="identity-dialog">
-  <div class="modal-head"><div><span class="kicker">WELCOME TO HOMEFLOW</span><h2>Who are you?</h2></div>{% if not needs_identity %}<button type="button" onclick="this.closest('dialog').close()">×</button>{% endif %}</div>
+  <div class="modal-head"><div><span class="kicker">WELCOME TO HOMEFLOW</span><h2>Who are you?</h2></div><button type="button" aria-label="Close" onclick="this.closest('dialog').close()">×</button></div>
   <p class="modal-copy">Choose your character. We’ll remember you on this device and personalise your calendar.</p>
-  <div class="people-picker">{% for person in roommates %}{% if person.active %}<form method="post" action="{% url 'rota:choose_person' %}">{% csrf_token %}<input type="hidden" name="roommate_id" value="{{ person.id }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button><span>{{ person.avatar }}</span><strong>{{ person.name }}</strong></button></form>{% endif %}{% endfor %}</div>
+  <div class="people-picker">{% for person in roommates %}{% if person.active %}<form method="post" action="{% url 'rota:choose_person' %}">{% csrf_token %}<input type="hidden" name="roommate_id" value="{{ person.id }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button><span>{{ person.avatar }}</span><strong>{{ person.name }}</strong></button></form>{% endif %}{% empty %}<p class="no-people">No roommates are set up yet.</p>{% endfor %}</div>
+  <div class="identity-actions"><button class="ghost" type="button" onclick="document.getElementById('identity').close()">Continue without choosing</button><button class="dark-button" type="button" onclick="openHouseholdSetup()">Add or manage roommates</button></div>
 </dialog>
 
 <dialog id="task-dialog"><form method="post" action="{% url 'rota:update_task' %}">{% csrf_token %}<input name="task_date" type="hidden"><input name="chore_id" type="hidden"><input name="roommate_id" type="hidden"><input name="next" type="hidden" value="{{ request.get_full_path }}"><header><span class="kicker">CHANGE TASK</span><button type="button" onclick="this.closest('dialog').close()">×</button></header><h2 id="task-title">Task details</h2><label class="field-label">Move to another day this week</label><input class="date-input" name="scheduled_for" type="date" required><label class="field-label">Shared note</label><textarea name="note" placeholder="Anything your housemates should know?"></textarea><button class="dark-button wide-button">Save for everyone</button></form></dialog>
@@ -90,6 +92,7 @@ document.querySelectorAll('[data-theme-choice]').forEach(b=>b.onclick=()=>{appea
 document.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>{appearance.accent=b.dataset.accent;localStorage.setItem('homeflow-accent',appearance.accent);applyAppearance()});
 document.querySelectorAll('[data-density]').forEach(b=>b.onclick=()=>{appearance.density=b.dataset.density;localStorage.setItem('homeflow-density',appearance.density);applyAppearance()});applyAppearance();
 function openTask(button){const d=document.getElementById('task-dialog');d.querySelector('[name=task_date]').value=button.dataset.date;d.querySelector('[name=scheduled_for]').value=button.dataset.scheduled;d.querySelector('[name=chore_id]').value=button.dataset.chore;d.querySelector('[name=roommate_id]').value=button.dataset.roommate;d.querySelector('#task-title').textContent=button.dataset.task;d.querySelector('textarea').value=button.dataset.note;d.showModal()}
+function openHouseholdSetup(){document.getElementById('identity').close();document.getElementById('setup').showModal()}
 {% if needs_identity %}document.getElementById('identity').showModal();{% endif %}
 </script>
 </body></html>
