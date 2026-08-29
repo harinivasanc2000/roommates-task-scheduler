@@ -92,3 +92,12 @@ class RotaSwap(models.Model):
 
     def __str__(self):
         return f"{self.requested_by} ↔ {self.requested_with} ({self.status})"
+
+
+class CelebrationCounter(models.Model):
+    roommate = models.ForeignKey(Roommate, on_delete=models.CASCADE)
+    chore = models.ForeignKey(Chore, on_delete=models.CASCADE)
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["roommate", "chore"], name="one_celebration_counter")]

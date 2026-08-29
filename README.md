@@ -19,6 +19,7 @@ The saved starting point is Monday 31 August 2026 with Huanlin. This makes the p
 - Personal identity picker remembered in the browser session.
 - Personal greetings, characters, and highlighted rota weeks.
 - Clear task completion buttons and weekly progress bars.
+- Three task-specific, personality-aware celebration messages per chore and roommate; repeat completions rotate to a different line.
 - Shared task notes and rescheduling within the assigned week.
 - Session-enforced ownership: the selected roommate can only complete, move, or annotate tasks assigned to them.
 - Whole-week swap requests with recipient notifications and explicit accept or decline.

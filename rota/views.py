@@ -8,7 +8,8 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Chore, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
+from .models import CelebrationCounter, Chore, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
+from .celebrations import celebration_for
 from .services import build_week, monday_for, week_owner
 
 
@@ -102,16 +103,13 @@ def update_task(request):
         return HttpResponseBadRequest("This task is not part of the current rota")
     status, _ = TaskStatus.objects.get_or_create(task_date=task_date, chore=chore, roommate=roommate)
     if "completed" in request.POST:
-        status.completed = request.POST["completed"] == "true"
-        if status.completed:
-            celebrations = {
-                "hari": f"Woof-tastic, Hari! 🐶 You smashed {chore.name}!",
-                "huanlin": f"太棒了，Huanlin！🦁 {chore.name} 完成啦！",
-                "hualin": f"太棒了，Hualin！🦁 {chore.name} 完成啦！",
-                "jaclyn": f"Beauty, Jaclyn! 🦘 {chore.name} is done and dusted!",
-                "tanith": f"Purr-fect, Tanith! 🐱 Cooper approves of that {chore.name}!",
-            }
-            messages.success(request, celebrations.get(roommate.name.lower(), f"Nice work, {roommate.name}! ✨ {chore.name} is done."))
+        marking_complete = request.POST["completed"] == "true"
+        if marking_complete and not status.completed:
+            counter, _ = CelebrationCounter.objects.get_or_create(roommate=roommate, chore=chore)
+            counter.count += 1
+            counter.save(update_fields=["count"])
+            messages.success(request, celebration_for(roommate, chore, counter.count))
+        status.completed = marking_complete
     if "note" in request.POST:
         status.note = request.POST["note"].strip()
     if "scheduled_for" in request.POST:

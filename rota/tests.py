@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 from django.test import TestCase
 from django.urls import reverse
-from .models import Chore, Roommate, RotaSettings, RotaSwap, TaskStatus
+from .celebrations import CATALOGUE, celebration_for
+from .models import CelebrationCounter, Chore, Roommate, RotaSettings, RotaSwap, TaskStatus
 from .services import build_week, week_owner
 
 
@@ -117,3 +118,18 @@ class RotaTests(TestCase):
         self.client.post(reverse("rota:respond_swap", args=[swap.id]), {"decision": "accepted"})
         self.assertEqual(week_owner(date(2026, 8, 24)), zara)
         self.assertEqual(week_owner(date(2026, 8, 31)), alex)
+
+    def test_every_housemate_has_three_distinct_messages_for_every_chore(self):
+        chore_names = set(Chore.objects.values_list("name", flat=True))
+        for person in ["hari", "huanlin", "jaclyn", "tanith"]:
+            self.assertEqual(set(CATALOGUE[person]), chore_names)
+            for messages in CATALOGUE[person].values():
+                self.assertEqual(len(messages), 3)
+                self.assertEqual(len(set(messages)), 3)
+
+    def test_repeated_chore_completions_advance_to_a_different_message(self):
+        hari = Roommate.objects.create(name="Hari")
+        trash = Chore.objects.get(name="Take the trash out")
+        first = celebration_for(hari, trash, 1)
+        second = celebration_for(hari, trash, 2)
+        self.assertNotEqual(first, second)
