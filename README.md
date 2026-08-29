@@ -27,3 +27,5 @@ python manage.py runserver
 Open `http://127.0.0.1:8000/` and use **Manage home** to add the four roommates. Starter chores are created by the first migration. Share this same URL after deploying the app to a public host.
 
 Before production deployment, set `SECRET_KEY`, `DEBUG`, and `ALLOWED_HOSTS` through secure configuration.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the step-by-step Render and PostgreSQL setup.
