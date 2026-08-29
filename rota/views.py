@@ -345,7 +345,7 @@ def calendar_download(request):
             f"SUMMARY:{summary}", "END:VEVENT",
         ]
     lines.append("END:VCALENDAR")
-    response = HttpResponse("\\r\\n".join(lines) + "\\r\\n", content_type="text/calendar; charset=utf-8")
+    response = HttpResponse("\n".join(lines) + "\n", content_type="text/calendar; charset=utf-8")
     safe_name = "".join(character for character in person.name.lower() if character.isalnum())
     response["Content-Disposition"] = f'attachment; filename="{safe_name}-rota-{week_start}.ics"'
     return response
