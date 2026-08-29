@@ -53,6 +53,11 @@ class Chore(models.Model):
         help_text="Day used for once-a-week chores.",
     )
     active = models.BooleanField(default=True)
+    effort = models.PositiveSmallIntegerField(
+        default=1,
+        choices=[(1, "Light"), (2, "Medium"), (3, "Heavy")],
+        help_text="Used for fairness weighting.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -114,6 +119,7 @@ class HouseholdNote(models.Model):
     author = models.ForeignKey(Roommate, on_delete=models.CASCADE, related_name="notes")
     body = models.CharField(max_length=280)
     pinned = models.BooleanField(default=False)
+    reactions = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
