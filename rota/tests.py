@@ -9,7 +9,9 @@ class RotaTests(TestCase):
     def setUp(self):
         Roommate.objects.create(name="Zara")
         Roommate.objects.create(name="Alex")
-        RotaSettings.objects.create(pk=1, rotation_start=date(2026, 8, 24))
+        RotaSettings.objects.update_or_create(pk=1, defaults={
+            "rotation_start": date(2026, 8, 24), "starting_roommate": None,
+        })
 
     def test_week_is_monday_to_sunday_and_trash_is_alternate_days(self):
         items = build_week(date(2026, 8, 26))
@@ -23,6 +25,17 @@ class RotaTests(TestCase):
         Roommate.objects.create(name="Ben")
         owners = [week_owner(date(2026, 8, 24) + timedelta(weeks=offset)).name for offset in range(4)]
         self.assertEqual(owners, ["Alex", "Ben", "Maya", "Zara"])
+
+    def test_rotation_start_can_be_changed_from_the_website(self):
+        hari = Roommate.objects.create(name="Hari")
+        huanlin = Roommate.objects.create(name="Huanlin")
+        response = self.client.post(reverse("rota:household"), {
+            "action": "update_rotation", "rotation_start": "2026-08-31",
+            "starting_roommate": huanlin.id,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(week_owner(date(2026, 8, 24)), hari)
+        self.assertEqual(week_owner(date(2026, 8, 31)), huanlin)
 
     def test_page_and_calendar_download(self):
         response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})

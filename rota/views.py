@@ -18,6 +18,7 @@ def _requested_week(request):
 
 def schedule(request):
     week_start = _requested_week(request)
+    rota_settings = RotaSettings.load()
     weeks = []
     all_items = []
     for week_offset in range(5):
@@ -54,7 +55,8 @@ def schedule(request):
         "next_week": week_start + timedelta(days=7),
         "roommates": Roommate.objects.order_by("name"),
         "chores": Chore.objects.order_by("name"),
-        "rotation_start": RotaSettings.load().rotation_start,
+        "rotation_start": rota_settings.rotation_start,
+        "rota_settings": rota_settings,
         "selected_person": selected_person,
         "needs_identity": selected_person is None,
     })
@@ -120,6 +122,16 @@ def household_settings(request):
         Roommate.objects.filter(pk=request.POST.get("id")).update(active=request.POST.get("active") == "true")
     elif action == "toggle_chore":
         Chore.objects.filter(pk=request.POST.get("id")).update(active=request.POST.get("active") == "true")
+    elif action == "update_rotation":
+        try:
+            rotation_start = monday_for(date.fromisoformat(request.POST["rotation_start"]))
+            starting_roommate = Roommate.objects.get(pk=request.POST["starting_roommate"], active=True)
+        except (KeyError, ValueError, Roommate.DoesNotExist):
+            return HttpResponseBadRequest("Choose a valid date and active roommate")
+        settings = RotaSettings.load()
+        settings.rotation_start = rotation_start
+        settings.starting_roommate = starting_roommate
+        settings.save(update_fields=["rotation_start", "starting_roommate"])
     return redirect(request.POST.get("next", "/"))
 
 

@@ -39,6 +39,12 @@ def week_owner(week_start, roommates=None):
     roommates = roommates or list(Roommate.objects.filter(active=True).order_by("name"))
     if not roommates:
         return None
-    anchor = monday_for(RotaSettings.load().rotation_start)
-    rotation = ((monday_for(week_start) - anchor).days // 7) % len(roommates)
+    settings = RotaSettings.load()
+    anchor = monday_for(settings.rotation_start)
+    try:
+        starting_index = next(index for index, person in enumerate(roommates)
+                              if person.id == settings.starting_roommate_id)
+    except StopIteration:
+        starting_index = 0
+    rotation = (starting_index + ((monday_for(week_start) - anchor).days // 7)) % len(roommates)
     return roommates[rotation]

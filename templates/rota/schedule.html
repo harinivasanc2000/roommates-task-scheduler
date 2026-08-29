@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="{% static 'rota/polish.css' %}">
   <link rel="stylesheet" href="{% static 'rota/appearance.css' %}">
   <link rel="stylesheet" href="{% static 'rota/mobile.css' %}">
+  <link rel="stylesheet" href="{% static 'rota/rotation.css' %}">
 </head>
 <body data-theme="pearl">
 <main>
@@ -18,6 +19,7 @@
         {% if selected_person %}<span>{{ selected_person.avatar }}</span> {{ selected_person.name }}{% else %}Who are you?{% endif %}
       </button>
       <button class="ghost" id="theme-button" type="button" onclick="document.getElementById('appearance').showModal()">Change look</button>
+      <button class="ghost rota-button" type="button" onclick="document.getElementById('rotation-dialog').showModal()">Rota start</button>
       <button class="dark-button" type="button" onclick="document.getElementById('setup').showModal()">Manage home</button>
     </div>
   </header>
@@ -66,6 +68,8 @@
 </dialog>
 
 <dialog id="task-dialog"><form method="post" action="{% url 'rota:update_task' %}">{% csrf_token %}<input name="task_date" type="hidden"><input name="chore_id" type="hidden"><input name="roommate_id" type="hidden"><input name="next" type="hidden" value="{{ request.get_full_path }}"><header><span class="kicker">CHANGE TASK</span><button type="button" onclick="this.closest('dialog').close()">×</button></header><h2 id="task-title">Task details</h2><label class="field-label">Move to another day this week</label><input class="date-input" name="scheduled_for" type="date" required><label class="field-label">Shared note</label><textarea name="note" placeholder="Anything your housemates should know?"></textarea><button class="dark-button wide-button">Save for everyone</button></form></dialog>
+
+<dialog id="rotation-dialog" class="rotation-dialog"><form method="post" action="{% url 'rota:household' %}">{% csrf_token %}<input type="hidden" name="action" value="update_rotation"><input type="hidden" name="next" value="{{ request.get_full_path }}"><header><div><span class="kicker">WEEKLY ORDER</span><h2>Choose where the rota starts</h2></div><button type="button" onclick="this.closest('dialog').close()">×</button></header><p class="modal-copy">The selected person owns the complete week beginning on this Monday. Each following Monday moves to the next active person alphabetically.</p><label class="field-label">Starting Monday</label><input class="date-input" type="date" name="rotation_start" value="{{ rotation_start|date:'Y-m-d' }}" required><label class="field-label">Who starts?</label><select class="date-input" name="starting_roommate" required>{% for roommate in roommates %}{% if roommate.active %}<option value="{{ roommate.id }}" {% if rota_settings.starting_roommate_id == roommate.id %}selected{% endif %}>{{ roommate.avatar }} {{ roommate.name }}</option>{% endif %}{% endfor %}</select><div class="rotation-example"><span>Current setup</span><strong>{% if rota_settings.starting_roommate %}{{ rota_settings.starting_roommate.avatar }} {{ rota_settings.starting_roommate.name }} starts {{ rotation_start|date:"l j F Y" }}{% else %}First active roommate starts {{ rotation_start|date:"l j F Y" }}{% endif %}</strong></div><button class="dark-button wide-button">Update everyone’s rota</button></form></dialog>
 
 <dialog id="appearance" class="appearance-dialog">
   <div class="modal-head"><div><span class="kicker">MAKE IT YOURS</span><h2>Change the look</h2></div><button type="button" onclick="this.closest('dialog').close()">×</button></div>

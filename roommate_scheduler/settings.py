@@ -10,6 +10,9 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set when DEBUG=False")
 ALLOWED_HOSTS = [host for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host]
 CSRF_TRUSTED_ORIGINS = [origin for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if origin]
+if render_hostname := os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(render_hostname)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{render_hostname}")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

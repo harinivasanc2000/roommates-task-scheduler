@@ -10,6 +10,9 @@ def upcoming_monday():
 
 class RotaSettings(models.Model):
     rotation_start = models.DateField(default=upcoming_monday)
+    starting_roommate = models.ForeignKey(
+        "Roommate", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
 
     @classmethod
     def load(cls):
