@@ -26,3 +26,16 @@ Experimental work lives on a separate branch until it has been tried and accepte
   - Visual overdue styling on calendar tasks.
 - Keep it if: housemates use skip/away/fairness without confusion and the dashboard still feels calm.
 - Rework or remove pieces if: the extra panels feel noisy on mobile, skip is overused, or fairness creates tension instead of clarity.
+
+
+## Notes & visual polish
+
+- Branch: `experiment/helpful-features` (continued)
+- Status: ready to try
+- What changes:
+  - Shared household sticky notes with pin/delete
+  - Task-note presets and character counter in the task dialog
+  - Richer note previews on calendar tasks
+  - Today highlight on the calendar
+  - Celebration entrance animation and soft card hover polish
+- Keep it if: notes reduce verbal reminders and the UI still feels calm on phones.
