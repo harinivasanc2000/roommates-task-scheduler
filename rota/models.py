@@ -26,6 +26,11 @@ class Roommate(models.Model):
     avatar = models.CharField(max_length=8, default="🙂")
     greeting = models.CharField(max_length=240, blank=True)
     active = models.BooleanField(default=True)
+    away_until = models.DateField(
+        null=True,
+        blank=True,
+        help_text="While set and in the future, this roommate is skipped in the weekly rotation.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -64,6 +69,7 @@ class TaskStatus(models.Model):
     completed = models.BooleanField(default=False)
     note = models.TextField(blank=True)
     scheduled_for = models.DateField(null=True, blank=True)
+    skipped = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
