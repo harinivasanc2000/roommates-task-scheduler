@@ -46,6 +46,8 @@ class RotaTests(TestCase):
         response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
         self.assertContains(response, "Next 5 weeks")
         self.assertContains(response, "Change the look")
+        self.assertContains(response, 'aria-label="Change appearance"')
+        self.assertContains(response, '<body data-theme="midnight">')
         self.assertContains(response, "Continue without choosing")
         alex = Roommate.objects.get(name="Alex")
         self.choose(alex)

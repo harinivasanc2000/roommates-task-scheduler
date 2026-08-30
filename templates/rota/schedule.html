@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="{% static 'rota/fun.css' %}">
   <link rel="stylesheet" href="{% static 'rota/next-task.css' %}">
 </head>
-<body data-theme="pearl">
+<body data-theme="midnight">
 <main>
   <header class="topbar">
     <a class="brand" href="/"><span class="brand-mark">✦</span><span>homeflow<small>shared home</small></span></a>
@@ -23,7 +23,7 @@
       <button class="identity-pill" type="button" onclick="document.getElementById('identity').showModal()">
         {% if selected_person %}<span>{{ selected_person.avatar }}</span> {{ selected_person.name }}{% else %}Who are you?{% endif %}
       </button>
-      <button class="ghost" id="theme-button" type="button" onclick="document.getElementById('appearance').showModal()">Change look</button>
+      <button class="ghost appearance-button" id="theme-button" type="button" aria-label="Change appearance" onclick="document.getElementById('appearance').showModal()"><span class="appearance-icon" aria-hidden="true">◐</span><span class="appearance-label">Change look</span></button>
       <button class="ghost rota-button" type="button" onclick="document.getElementById('rotation-dialog').showModal()">Rota start</button>
       <button class="dark-button" type="button" onclick="document.getElementById('setup').showModal()">Manage home</button>
     </div>
@@ -117,7 +117,7 @@
 
 <script>
 const body=document.body;
-const appearance={theme:localStorage.getItem('homeflow-theme')||'pearl',accent:localStorage.getItem('homeflow-accent')||'',density:localStorage.getItem('homeflow-density')||'comfortable'};
+const appearance={theme:localStorage.getItem('homeflow-theme')||'midnight',accent:localStorage.getItem('homeflow-accent')||'',density:localStorage.getItem('homeflow-density')||'comfortable'};
 function applyAppearance(){body.dataset.theme=appearance.theme;body.dataset.density=appearance.density;if(appearance.accent){body.style.setProperty('--accent',appearance.accent)}else{body.style.removeProperty('--accent')}document.querySelectorAll('[data-theme-choice]').forEach(b=>b.classList.toggle('selected',b.dataset.themeChoice===appearance.theme));document.querySelectorAll('[data-accent]').forEach(b=>b.classList.toggle('selected',b.dataset.accent===appearance.accent));document.querySelectorAll('[data-density]').forEach(b=>b.classList.toggle('selected',b.dataset.density===appearance.density))}
 document.querySelectorAll('[data-theme-choice]').forEach(b=>b.onclick=()=>{appearance.theme=b.dataset.themeChoice;localStorage.setItem('homeflow-theme',appearance.theme);applyAppearance()});
 document.querySelectorAll('[data-accent]').forEach(b=>b.onclick=()=>{appearance.accent=b.dataset.accent;localStorage.setItem('homeflow-accent',appearance.accent);applyAppearance()});
