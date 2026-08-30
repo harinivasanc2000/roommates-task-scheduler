@@ -54,6 +54,8 @@ class RotaTests(TestCase):
         calendar = self.client.get(reverse("rota:calendar"), {"week": "2026-08-24", "person": Roommate.objects.get(name="Zara").id})
         self.assertEqual(calendar["Content-Type"], "text/calendar; charset=utf-8")
         self.assertIn(b"BEGIN:VCALENDAR", calendar.content)
+        self.assertIn(b"\r\n", calendar.content)
+        self.assertNotIn(b"\n", calendar.content.replace(b"\r\n", b""))
         self.assertIn(b"Alex", calendar.content)
         self.assertNotIn(b"Zara", calendar.content)
 
@@ -109,6 +111,25 @@ class RotaTests(TestCase):
         })
         self.assertEqual(response.status_code, 403)
         self.assertFalse(TaskStatus.objects.exists())
+
+    def test_bulk_complete_today_only_changes_selected_roommates_tasks(self):
+        today = date.today()
+        owner = week_owner(today)
+        self.choose(owner)
+        today_items = [item for item in build_week(today) if item.date == today]
+
+        response = self.client.post(reverse("rota:bulk_complete_today"))
+
+        self.assertEqual(response.status_code, 302)
+        for item in today_items:
+            self.assertTrue(TaskStatus.objects.get(
+                task_date=item.date, chore=item.chore, roommate=owner
+            ).completed)
+        self.assertFalse(TaskStatus.objects.exclude(roommate=owner).exists())
+
+    def test_bulk_complete_today_requires_an_identity(self):
+        response = self.client.post(reverse("rota:bulk_complete_today"))
+        self.assertEqual(response.status_code, 403)
 
     def test_completion_progress_does_not_carry_to_next_roommate(self):
         alex = Roommate.objects.get(name="Alex")

@@ -321,6 +321,50 @@ def household_note(request):
     return redirect(request.POST.get("next", "/"))
 
 
+@require_POST
+def bulk_complete_today(request):
+    selected_person = Roommate.objects.filter(
+        pk=request.session.get("roommate_id"), active=True
+    ).first()
+    if not selected_person:
+        return HttpResponseForbidden("Choose who you are first")
+
+    today = date.today()
+    completed_count = 0
+    for item in build_week(monday_for(today)):
+        if item.roommate != selected_person:
+            continue
+        status = TaskStatus.objects.filter(
+            task_date=item.date,
+            chore=item.chore,
+            roommate=selected_person,
+        ).first()
+        if (status.scheduled_for if status and status.scheduled_for else item.date) != today:
+            continue
+        status, _ = TaskStatus.objects.get_or_create(
+            task_date=item.date, chore=item.chore, roommate=selected_person
+        )
+        if status.completed:
+            continue
+        status.completed = True
+        status.skipped = False
+        status.save(update_fields=["completed", "skipped", "updated_at"])
+        counter, _ = CelebrationCounter.objects.get_or_create(
+            roommate=selected_person,
+            chore=item.chore,
+        )
+        counter.count += 1
+        counter.save(update_fields=["count"])
+        completed_count += 1
+
+    if completed_count:
+        noun = "task is" if completed_count == 1 else "tasks are"
+        messages.success(request, f"Today’s {completed_count} {noun} complete — brilliant work!")
+    else:
+        messages.info(request, "You have no unfinished tasks scheduled for today.")
+    return redirect(request.POST.get("next", "/"))
+
+
 def calendar_download(request):
     week_start = _requested_week(request)
     person_id = request.session.get("roommate_id")
@@ -345,7 +389,7 @@ def calendar_download(request):
             f"SUMMARY:{summary}", "END:VEVENT",
         ]
     lines.append("END:VCALENDAR")
-    response = HttpResponse("\n".join(lines) + "\n", content_type="text/calendar; charset=utf-8")
+    response = HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/calendar; charset=utf-8")
     safe_name = "".join(character for character in person.name.lower() if character.isalnum())
     response["Content-Disposition"] = f'attachment; filename="{safe_name}-rota-{week_start}.ics"'
     return response
