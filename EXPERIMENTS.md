@@ -39,3 +39,17 @@ Experimental work lives on a separate branch until it has been tried and accepte
   - Today highlight on the calendar
   - Celebration entrance animation and soft card hover polish
 - Keep it if: notes reduce verbal reminders and the UI still feels calm on phones.
+
+## Off-week context, read-only sharing, and task alerts
+
+- Branch: `experiment/helpful-features` (continued)
+- Status: ready for local household testing
+- Hypothesis: people will check the rota more willingly when an off-week feels genuinely relaxed, while a small read-only window into the active rota reduces repeated questions.
+- What changes:
+  - The default calendar begins with the real current Monday instead of skipping to the next week.
+  - Off-duty roommates receive character-specific “chill” copy naming the current owner and the date of their next rota.
+  - The current owner’s tasks open in a read-only view; later roommates’ weeks stay collapsed until requested.
+  - Completion totals, explicit Completed/Pending states, shared notes, and rescheduled dates are visible without exposing edit controls.
+  - A task owner can attach a 180-character house alert. Other roommates see it prominently throughout that week, including after the task is completed.
+- Keep it if: roommates understand who is on duty, can find useful notes without accidentally editing, and use alerts only for genuinely useful timing or safety messages.
+- Rework or remove it if: seeing another person’s progress feels pressuring, alerts become noisy, or the expanded current week makes the phone view too long.

@@ -1,9 +1,11 @@
 from datetime import date, timedelta
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from .celebrations import CATALOGUE, celebration_for
 from .models import CelebrationCounter, Chore, Roommate, RotaSettings, RotaSwap, TaskStatus
-from .services import build_week, week_owner
+from .services import build_week, monday_for, week_owner
+from .views import _off_week_message
 
 
 class RotaTests(TestCase):
@@ -82,8 +84,13 @@ class RotaTests(TestCase):
 
     def test_next_task_card_advances_after_completion(self):
         alex = Roommate.objects.get(name="Alex")
+        current_week = monday_for(timezone.localdate())
+        settings = RotaSettings.load()
+        settings.rotation_start = current_week
+        settings.starting_roommate = alex
+        settings.save()
         self.choose(alex)
-        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        response = self.client.get(reverse("rota:schedule"), {"week": current_week.isoformat()})
         first_task = response.context["next_task"]
         self.assertEqual(first_task.roommate, alex)
         self.assertFalse(first_task.completed)
@@ -95,7 +102,7 @@ class RotaTests(TestCase):
             "roommate_id": alex.id,
             "completed": "true",
         })
-        response = self.client.get(reverse("rota:schedule"), {"week": "2026-08-24"})
+        response = self.client.get(reverse("rota:schedule"), {"week": current_week.isoformat()})
         self.assertNotEqual(
             (response.context["next_task"].original_date, response.context["next_task"].chore.id),
             (first_task.original_date, first_task.chore.id),
@@ -111,6 +118,123 @@ class RotaTests(TestCase):
         })
         self.assertEqual(response.status_code, 403)
         self.assertFalse(TaskStatus.objects.exists())
+
+    def test_default_view_starts_with_the_real_current_week(self):
+        response = self.client.get(reverse("rota:schedule"))
+        self.assertEqual(response.context["week_start"], monday_for(timezone.localdate()))
+
+    def test_off_week_greeting_names_owner_and_next_turn(self):
+        alex = Roommate.objects.get(name="Alex")
+        zara = Roommate.objects.get(name="Zara")
+        current_week = monday_for(timezone.localdate())
+        settings = RotaSettings.load()
+        settings.rotation_start = current_week
+        settings.starting_roommate = alex
+        settings.save()
+        self.choose(zara)
+
+        response = self.client.get(reverse("rota:schedule"))
+
+        self.assertEqual(response.context["current_owner"], alex)
+        self.assertEqual(response.context["next_personal_week_start"], current_week + timedelta(days=7))
+        self.assertContains(response, "Chill, Zara — Alex has this week covered")
+        self.assertContains(response, "YOUR NEXT ROTA")
+        self.assertNotContains(response, "UP NEXT FOR YOU")
+
+    def test_personalized_off_week_messages_match_housemate_characters(self):
+        owner = Roommate.objects.get(name="Alex")
+        examples = {
+            "Hari": "Paws up",
+            "Huanlin": "这周轻松一下",
+            "Jaclyn": "No worries",
+            "Tanith": "Cooper says relax",
+        }
+        for name, phrase in examples.items():
+            person = Roommate(name=name)
+            self.assertIn(phrase, _off_week_message(person, owner))
+
+    def test_other_roommates_completion_and_full_note_are_read_only(self):
+        alex = Roommate.objects.get(name="Alex")
+        zara = Roommate.objects.get(name="Zara")
+        current_week = monday_for(timezone.localdate())
+        settings = RotaSettings.load()
+        settings.rotation_start = current_week
+        settings.starting_roommate = alex
+        settings.save()
+        item = build_week(current_week)[0]
+        TaskStatus.objects.create(
+            task_date=item.date,
+            chore=item.chore,
+            roommate=alex,
+            completed=True,
+            note="Please leave the clean cloth beside the sink for everyone.",
+        )
+        self.choose(zara)
+
+        response = self.client.get(reverse("rota:schedule"))
+        html = response.content.decode()
+        task_html = html.split('aria-label="Read-only task for Alex"', 1)[1].split("</article>", 1)[0]
+
+        self.assertIn("Completed", task_html)
+        self.assertIn("Please leave the clean cloth beside the sink for everyone.", task_html)
+        self.assertNotIn("<form", task_html)
+        self.assertNotIn("openTask", task_html)
+
+    def test_task_owner_can_alert_housemates_and_alert_survives_completion(self):
+        alex = Roommate.objects.get(name="Alex")
+        zara = Roommate.objects.get(name="Zara")
+        current_week = monday_for(timezone.localdate())
+        settings = RotaSettings.load()
+        settings.rotation_start = current_week
+        settings.starting_roommate = alex
+        settings.save()
+        item = build_week(current_week)[0]
+        alert = "Floor is wet until 8pm — please use the other hallway."
+        self.choose(alex)
+        self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(),
+            "chore_id": item.chore.id,
+            "roommate_id": alex.id,
+            "house_alert": alert,
+        })
+
+        self.choose(zara)
+        response = self.client.get(reverse("rota:schedule"), {"week": (current_week + timedelta(days=35)).isoformat()})
+        self.assertContains(response, "HOUSE HEADS-UP")
+        self.assertContains(response, alert)
+
+        forbidden = self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(),
+            "chore_id": item.chore.id,
+            "roommate_id": alex.id,
+            "house_alert": "Changed by someone else",
+        })
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(TaskStatus.objects.get().house_alert, alert)
+
+        self.choose(alex)
+        self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(),
+            "chore_id": item.chore.id,
+            "roommate_id": alex.id,
+            "completed": "true",
+        })
+        self.choose(zara)
+        response = self.client.get(reverse("rota:schedule"))
+        self.assertContains(response, alert)
+        self.assertContains(response, "task completed")
+
+        self.choose(alex)
+        self.client.post(reverse("rota:update_task"), {
+            "task_date": item.date.isoformat(),
+            "chore_id": item.chore.id,
+            "roommate_id": alex.id,
+            "house_alert": "",
+        })
+        self.choose(zara)
+        response = self.client.get(reverse("rota:schedule"))
+        self.assertNotContains(response, alert)
+        self.assertNotContains(response, "HOUSE HEADS-UP")
 
     def test_bulk_complete_today_only_changes_selected_roommates_tasks(self):
         today = date.today()
@@ -143,8 +267,8 @@ class RotaTests(TestCase):
         self.assertGreater(response.context["weeks"][0]["percent"], 0)
         self.assertEqual(response.context["weeks"][1]["percent"], 0)
         self.assertContains(response, "Nice work, Alex!")
-        self.assertContains(response, "Zara’s rota")
-        self.assertContains(response, "Their tasks and progress are private to their view")
+        self.assertContains(response, "See Zara’s current tasks and notes")
+        self.assertContains(response, "Read only")
 
     def test_swap_requires_target_confirmation_and_exchanges_weeks(self):
         alex = Roommate.objects.get(name="Alex")

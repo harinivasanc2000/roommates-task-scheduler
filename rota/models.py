@@ -73,6 +73,11 @@ class TaskStatus(models.Model):
     roommate = models.ForeignKey(Roommate, on_delete=models.CASCADE)
     completed = models.BooleanField(default=False)
     note = models.TextField(blank=True)
+    house_alert = models.CharField(
+        max_length=180,
+        blank=True,
+        help_text="An important task update shown prominently to the other roommates.",
+    )
     scheduled_for = models.DateField(null=True, blank=True)
     skipped = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)

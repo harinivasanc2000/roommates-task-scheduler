@@ -8,7 +8,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import CelebrationCounter, Chore, HouseholdNote, Roommate, RotaSettings, RotaSwap, TaskStatus, upcoming_monday
+from .models import CelebrationCounter, Chore, HouseholdNote, Roommate, RotaSettings, RotaSwap, TaskStatus
 from .celebrations import celebration_for
 from .services import (
     available_roommates,
@@ -25,7 +25,22 @@ def _requested_week(request):
     try:
         return monday_for(date.fromisoformat(request.GET.get("week", "")))
     except ValueError:
-        return upcoming_monday()
+        return monday_for(timezone.localdate())
+
+
+def _off_week_message(person, owner):
+    owner_name = owner.name if owner else "someone else"
+    messages_by_person = {
+        "hari": f"Paws up, Hari — {owner_name} has this week covered. Time for a well-earned lie-down!",
+        "huanlin": f"这周轻松一下，Huanlin！轮到 {owner_name}，安心休息吧。",
+        "hualin": f"这周轻松一下，Hualin！轮到 {owner_name}，安心休息吧。",
+        "jaclyn": f"Kick back, Jaclyn — {owner_name} has this week sorted. No worries!",
+        "tanith": f"Catnap approved, Tanith — {owner_name} is on duty. Cooper says relax.",
+    }
+    return messages_by_person.get(
+        person.name.casefold(),
+        f"Chill, {person.name} — {owner_name} has this week covered.",
+    )
 
 
 def schedule(request):
@@ -44,13 +59,31 @@ def schedule(request):
             task_date__gte=week_start, task_date__lte=week_start + timedelta(days=34)
         )
     }
-    today = date.today()
+    today = timezone.localdate()
+    current_week_start = monday_for(today)
+    current_owner = week_owner(current_week_start)
+    owns_current_week = bool(selected_person and current_owner == selected_person)
+    next_personal_week_start = None
+    if selected_person:
+        next_personal_week_start = next(
+            (
+                current_week_start + timedelta(weeks=offset)
+                for offset in range(53)
+                if week_owner(current_week_start + timedelta(weeks=offset)) == selected_person
+            ),
+            None,
+        )
+    next_personal_week_end = (
+        next_personal_week_start + timedelta(days=6)
+        if next_personal_week_start else None
+    )
     for item in all_items:
         item.status = statuses.get((item.date, item.chore.id, item.roommate.id))
         item.original_date = item.date
         item.completed = item.status.completed if item.status else False
         item.skipped = item.status.skipped if item.status else False
         item.note = item.status.note if item.status else ""
+        item.house_alert = item.status.house_alert if item.status else ""
         if item.status and item.status.scheduled_for:
             item.date = item.status.scheduled_for
         item.is_overdue = (not item.completed) and item.date < today
@@ -63,6 +96,8 @@ def schedule(request):
             day = start + timedelta(days=offset)
             days.append({"date": day, "items": [item for item in week_items if item.date == day]})
         done = sum(item.completed for item in week_items)
+        note_count = sum(bool(item.note) for item in week_items)
+        alert_count = sum(bool(item.house_alert) for item in week_items)
         owner = week_owner(start)
         weeks.append({
             "start": start,
@@ -70,12 +105,16 @@ def schedule(request):
             "days": days,
             "owner": owner,
             "is_mine": bool(selected_person and owner == selected_person),
+            "is_current": start == current_week_start,
             "done": done,
             "total": len(week_items),
+            "note_count": note_count,
+            "alert_count": alert_count,
             "percent": round((done / len(week_items)) * 100) if week_items else 0,
         })
 
     personal_week = next((week for week in weeks if week["is_mine"]), None)
+    current_week_data = next((week for week in weeks if week["is_current"]), None)
     personal_items = sorted(
         (
             item for item in all_items
@@ -104,6 +143,21 @@ def schedule(request):
         sent_swaps = RotaSwap.objects.filter(requested_by=selected_person)[:3]
         stats = personal_stats(selected_person, all_items, statuses, today)
 
+    house_alerts = []
+    if selected_person:
+        house_alerts = list(
+            TaskStatus.objects.select_related("roommate", "chore")
+            .filter(
+                task_date__gte=current_week_start,
+                task_date__lte=current_week_start + timedelta(days=6),
+            )
+            .exclude(roommate=selected_person)
+            .exclude(house_alert="")
+            .order_by("scheduled_for", "task_date", "chore__name")
+        )
+        for alert in house_alerts:
+            alert.display_date = alert.scheduled_for or alert.task_date
+
     return render(request, "rota/schedule.html", {
         "weeks": weeks,
         "week_start": week_start,
@@ -116,6 +170,17 @@ def schedule(request):
         "selected_person": selected_person,
         "needs_identity": selected_person is None,
         "personal_week": personal_week,
+        "current_week_data": current_week_data,
+        "current_week_start": current_week_start,
+        "current_week_end": current_week_start + timedelta(days=6),
+        "current_owner": current_owner,
+        "owns_current_week": owns_current_week,
+        "off_week_message": (
+            _off_week_message(selected_person, current_owner)
+            if selected_person and not owns_current_week else ""
+        ),
+        "next_personal_week_start": next_personal_week_start,
+        "next_personal_week_end": next_personal_week_end,
         "next_task": next_task,
         "remaining_personal_tasks": len(personal_items),
         "incoming_swaps": incoming_swaps,
@@ -125,6 +190,7 @@ def schedule(request):
         "activity": recent_activity(),
         "today": today,
         "household_notes": HouseholdNote.objects.select_related("author")[:12],
+        "house_alerts": house_alerts,
         "note_presets": [
             "Bin bags under the sink",
             "Cleaning spray is low",
@@ -173,7 +239,7 @@ def update_task(request):
     if request.POST.get("skip") == "true":
         status.skipped = True
         current = status.scheduled_for or task_date
-        tomorrow = date.today() + timedelta(days=1)
+        tomorrow = timezone.localdate() + timedelta(days=1)
         week_start = monday_for(task_date)
         week_end = week_start + timedelta(days=6)
         if week_start <= tomorrow <= week_end and tomorrow > current:
@@ -181,6 +247,8 @@ def update_task(request):
         status.completed = False
     if "note" in request.POST:
         status.note = request.POST["note"].strip()
+    if "house_alert" in request.POST:
+        status.house_alert = request.POST["house_alert"].strip()[:180]
     if "scheduled_for" in request.POST and request.POST.get("skip") != "true":
         scheduled_for = date.fromisoformat(request.POST["scheduled_for"])
         week_start = monday_for(task_date)
@@ -329,7 +397,7 @@ def bulk_complete_today(request):
     if not selected_person:
         return HttpResponseForbidden("Choose who you are first")
 
-    today = date.today()
+    today = timezone.localdate()
     completed_count = 0
     for item in build_week(monday_for(today)):
         if item.roommate != selected_person:
